@@ -24,12 +24,6 @@ def simple_shorter_salt(urls_id):
 
 # Функция взаимодействия с базой данных PostgreSQL
 # TODO Нужно отрефакторить ее и разбить на несколько
-# TODO Ошибка, дубли от многопотока, пример 1 сайта в 5 потоков:
-#  449406		timeanddate.com
-#  449405		timeanddate.com
-#  449404		timeanddate.com
-#  449403	2egwga	timeanddate.com
-#  449402	bk2D2v	timeanddate.com
 def data_base_interaction(site):
     try:
         connection = psycopg2.connect(user='postgres',
@@ -65,7 +59,6 @@ def data_base_interaction(site):
             cursor.execute('SELECT shorturl, longurl FROM urls ' +
                            'WHERE longurl=%(longurl)s', {'longurl': site})
             return cursor.fetchall()[0][0]  # Возвращаем короткий урл
-
     except (Exception, Error) as error:
         print("ERROR with PostgreSQL", error)
     finally:

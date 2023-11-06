@@ -14,7 +14,7 @@ try:
     create_table_query = ''' CREATE TABLE urls
                                 (id SERIAL PRIMARY KEY NOT NULL,
                                 shortUrl VARCHAR(16) UNIQUE,
-                                longUrl VARCHAR(512) NOT NULL); '''
+                                longUrl VARCHAR(512) UNIQUE NOT NULL); '''
     cursor.execute(create_table_query)
     connection.commit()
     print('Table created successful')
