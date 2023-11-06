@@ -9,7 +9,7 @@ import pandas as pd
 # Параметры
 number_of_top_sites = 1_000_000  # Размер списка наиболее посещаемых сайтов
 request_qty_per_thread = 10000  # Количество запросов которое должен выполнить каждый поток
-other_sites_requests_factor = 10  # Фактор выборки (%) из списка other_sites
+other_sites_requests_factor = 1000  # Фактор выборки (%) из списка other_sites
 
 
 # Подготовка данных из которых затем будут формироваться запросы
