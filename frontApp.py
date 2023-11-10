@@ -8,8 +8,9 @@ import pandas as pd
 
 # Параметры
 number_of_top_sites = 1_000_000  # Размер списка наиболее посещаемых сайтов
-request_qty_per_thread = 10000  # Количество запросов которое должен выполнить каждый поток
-other_sites_requests_factor = 1000  # Фактор выборки (%) из списка other_sites
+threads = 20  # Кол-во потоков, которые будут делать HTTP запросы
+request_qty_per_thread = 100000  # Количество запросов которое должен выполнить каждый поток
+other_sites_requests_factor = 10000  # Фактор выборки (%) из списка other_sites
 
 
 # Подготовка данных из которых затем будут формироваться запросы
@@ -52,19 +53,29 @@ def api_requests(num_thread):
 
     # Генерация реквестов
     request_start = time.time()
+    rq_qty = 0
+    cache_hits = 0
+    cache_misses = 0
     for i in range(request_qty_per_thread):
         if i % other_sites_requests_factor == 0:
             site = other_sites_list[random.randint(0, len(other_sites_list) - 1)]
-            session.get('http://127.0.0.1:8000/api/v1/urls/short', params={"site": site}).json()
+            rs = session.get('http://127.0.0.1:8000/api/v1/urls/short', params={"site": site}).json()
         else:
             site = top_sites_list[random.randint(0, len(top_sites_list) - 1)]
-            session.get('http://127.0.0.1:8000/api/v1/urls/short', params={"site": site}).json()
+            rs = session.get('http://127.0.0.1:8000/api/v1/urls/short', params={"site": site}).json()
+        rq_qty += 1
+        redis_status = rs.get('redis')
+        if redis_status == 'miss':
+            cache_misses += 1
+        else:
+            cache_hits += 1
     request_end = time.time()
 
-    print('Requests complete: ', request_qty_per_thread, 'for time: ', request_end - request_start, 'sec')
-
+    print(f'Requests complete for time: {(request_end - request_start):0.2f} sec')
+    print(f'Performance per thread: {(rq_qty/(request_end-request_start)):0.0f} rps')
+    print(f'Redis stats: hits: {cache_hits}, misses: {cache_misses}')
 
 # Запускаем функцию api_requests в N потоках (указано в range)
-for i in range(20):
+for i in range(threads):
     thread = threading.Thread(target=api_requests, args=(i,))
     thread.start()

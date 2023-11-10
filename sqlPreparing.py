@@ -13,13 +13,14 @@ try:
     cursor = connection.cursor()
     create_table_query = ''' CREATE TABLE urls
                                 (id SERIAL PRIMARY KEY NOT NULL,
-                                shortUrl VARCHAR(16) UNIQUE,
-                                longUrl VARCHAR(512) UNIQUE NOT NULL); '''
+                                shorturl VARCHAR(16) UNIQUE,
+                                longurl VARCHAR(512) UNIQUE NOT NULL); '''
     cursor.execute(create_table_query)
     connection.commit()
     print('Table created successful')
 except (Exception, Error) as error:
     print("ERROR with PostgreSQL", error)
+
 finally:
     if connection:
         cursor.close()

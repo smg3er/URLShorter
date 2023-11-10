@@ -1,12 +1,12 @@
-import fastapi
 from hashids import Hashids
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-import psycopg2
-from psycopg2 import Error
 import os
+from psycopg2 import Error
+import psycopg2
 import uvicorn
 import psutil
+import redis
 
 # Функция генерации короткого урла на основании id записи из БД
 def simple_shorter(urls_id):
@@ -23,7 +23,6 @@ def simple_shorter_salt(urls_id):
     return short_url
 
 # Функция взаимодействия с базой данных PostgreSQL
-# TODO Нужно отрефакторить ее и разбить на несколько
 def data_base_interaction(site):
     try:
         connection = psycopg2.connect(user='postgres',
@@ -71,14 +70,21 @@ def data_base_interaction(site):
 # Функции сервера fastAPI
 # Чтобы запустить из cmd "uvicorn apiServer:app --reload"
 app = FastAPI()
-
+r = redis.Redis(host='localhost', port=6379)
 
 @app.get("/api/v1/urls/short")
 def get_request_processor(site):
     domain = 'https://smg3.ru/'
-    short_url = domain + str(data_base_interaction(site))
-    response = {"longUrl": site, "shortUrl": short_url}
-    return JSONResponse(content=response)
+    redis_data = r.get(site)  # Получаем пару из Redis по longurl
+    if redis_data is None:  # Если в Redis нет значения, то взаимодействуем с PostgreSQL
+        short_url = domain + str(data_base_interaction(site))
+        response = {"longUrl": site, "shortUrl": short_url, "redis": "miss"}
+        r.set(site, short_url)  # Добавляем в Redis пару
+        return JSONResponse(content=response)
+    else:  # Иначе возвращаем из Redis
+        short_url = domain + str(redis_data.decode('utf-8'))
+        response = {"longUrl": site, "shortUrl": short_url, "redis": "hit"}
+        return JSONResponse(content=response)
 
 @app.get("/stop")
 def stop():
@@ -87,6 +93,8 @@ def stop():
     for child in parent.children(recursive=True):
         child.kill()
     parent.kill()
+
+
 
 if __name__ == '__main__':
     uvicorn.run(app, host='127.0.0.1', port=8000)
