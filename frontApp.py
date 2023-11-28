@@ -7,10 +7,10 @@ import time
 import pandas as pd
 
 # Параметры
-number_of_top_sites = 1_000_000  # Размер списка наиболее посещаемых сайтов
-threads = 22  # Кол-во потоков, которые будут делать HTTP запросы
-request_qty_per_thread = 100_000  # Количество запросов которое должен выполнить каждый поток
-other_sites_requests_factor = 200 # Фактор выборки (%) из списка other_sites
+number_of_top_sites = 200_000  # Размер списка наиболее посещаемых сайтов
+threads = 64  # Кол-во потоков, которые будут делать HTTP запросы
+request_qty_per_thread = 20000  # Количество запросов которое должен выполнить каждый поток
+other_sites_requests_factor = 11 # Фактор выборки (%) из списка other_sites
 
 
 # Подготовка данных из которых затем будут формироваться запросы
@@ -46,7 +46,7 @@ other_sites_list = other_sites_data_preparing()
 def api_requests(num_thread):
     # Функция генерации запросов и ее параметры
     session = requests.Session()
-    retry = Retry(connect=3, backoff_factor=1)
+    retry = Retry(connect=2, backoff_factor=1)
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
