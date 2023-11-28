@@ -8,9 +8,9 @@ import pandas as pd
 
 # Параметры
 number_of_top_sites = 1_000_000  # Размер списка наиболее посещаемых сайтов
-threads = 20  # Кол-во потоков, которые будут делать HTTP запросы
-request_qty_per_thread = 100000  # Количество запросов которое должен выполнить каждый поток
-other_sites_requests_factor = 10000  # Фактор выборки (%) из списка other_sites
+threads = 22  # Кол-во потоков, которые будут делать HTTP запросы
+request_qty_per_thread = 100_000  # Количество запросов которое должен выполнить каждый поток
+other_sites_requests_factor = 200 # Фактор выборки (%) из списка other_sites
 
 
 # Подготовка данных из которых затем будут формироваться запросы
@@ -59,10 +59,10 @@ def api_requests(num_thread):
     for i in range(request_qty_per_thread):
         if i % other_sites_requests_factor == 0:
             site = other_sites_list[random.randint(0, len(other_sites_list) - 1)]
-            rs = session.get('http://127.0.0.1:8000/api/v1/urls/short', params={"site": site}).json()
+            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site}).json()
         else:
             site = top_sites_list[random.randint(0, len(top_sites_list) - 1)]
-            rs = session.get('http://127.0.0.1:8000/api/v1/urls/short', params={"site": site}).json()
+            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site}).json()
         rq_qty += 1
         redis_status = rs.get('redis')
         if redis_status == 'miss':
