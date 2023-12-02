@@ -8,9 +8,9 @@ import pandas as pd
 
 # Параметры
 number_of_top_sites = 200_000  # Размер списка наиболее посещаемых сайтов
-threads = 64  # Кол-во потоков, которые будут делать HTTP запросы
-request_qty_per_thread = 20000  # Количество запросов которое должен выполнить каждый поток
-other_sites_requests_factor = 11 # Фактор выборки (%) из списка other_sites
+threads = 20  # Кол-во потоков, которые будут делать HTTP запросы
+request_qty_per_thread = 50000  # Количество запросов которое должен выполнить каждый поток
+other_sites_requests_factor = 12 # Фактор выборки (%) из списка other_sites
 
 
 # Подготовка данных из которых затем будут формироваться запросы
@@ -46,10 +46,9 @@ other_sites_list = other_sites_data_preparing()
 def api_requests(num_thread):
     # Функция генерации запросов и ее параметры
     session = requests.Session()
-    retry = Retry(connect=2, backoff_factor=1)
+    retry = Retry(connect=2, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('http://', adapter)
-    session.mount('https://', adapter)
 
     # Генерация реквестов
     request_start = time.time()
@@ -59,12 +58,31 @@ def api_requests(num_thread):
     for i in range(request_qty_per_thread):
         if i % other_sites_requests_factor == 0:
             site = other_sites_list[random.randint(0, len(other_sites_list) - 1)]
-            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site}).json()
+            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site})
+            rs_json = rs.json()
+            if rs.status_code != 200:
+                print('ERROR found', rs)
+            elif rs_json.get('shortUrl') == 'https://smg3.ru/None':
+                print('ERROR found, shortUrl = None', rs_json)
+            elif rs_json.get('error') == 'DB_NONE':
+                print('****DB ERROR found, shortUrl = None', rs_json)
+            else:
+                pass
         else:
             site = top_sites_list[random.randint(0, len(top_sites_list) - 1)]
-            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site}).json()
+            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site})
+            rs_json = rs.json()
+            if rs.status_code != 200:
+                print('ERROR found', rs)
+            elif rs_json.get('shortUrl') == 'https://smg3.ru/None':
+                print('ERROR found, shortUrl = None', rs_json)
+            elif rs_json.get('error') == 'DB_NONE':
+                print('****DB ERROR found, shortUrl = None', rs_json)
+            else:
+                pass
+
         rq_qty += 1
-        redis_status = rs.get('redis')
+        redis_status = rs_json.get('redis')
         if redis_status == 'miss':
             cache_misses += 1
         else:
@@ -79,3 +97,4 @@ def api_requests(num_thread):
 for i in range(threads):
     thread = threading.Thread(target=api_requests, args=(i,))
     thread.start()
+    time.sleep(0.5)
