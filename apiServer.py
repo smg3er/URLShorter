@@ -24,11 +24,13 @@ def simple_shorter_salt(urls_id):
 
 # Функция взаимодействия с базой данных PostgreSQL
 def data_base_interaction(site):
+    connection = None
+    cursor = None
     try:
         connection = psycopg2.connect(user='postgres',
                                       password='123',
-                                      host='127.0.0.1',
-                                      port='5432',
+                                      host='192.168.68.110',
+                                      port='6432',
                                       database='urls')
         cursor = connection.cursor()
         cursor.execute('SELECT shorturl, longurl FROM urls ' +
@@ -70,7 +72,7 @@ def data_base_interaction(site):
 # Функции сервера fastAPI
 # Чтобы запустить из cmd "uvicorn apiServer:app --reload"
 app = FastAPI()
-r = redis.Redis(host='localhost', port=6379)
+r = redis.Redis(host='192.168.68.110', port=6379)
 
 @app.get("/api/v1/urls/short")
 def get_request_processor(site):
@@ -82,7 +84,7 @@ def get_request_processor(site):
         r.set(site, short_url)  # Добавляем в Redis пару
         return JSONResponse(content=response)
     else:  # Иначе возвращаем из Redis
-        short_url = domain + str(redis_data.decode('utf-8'))
+        short_url = str(redis_data.decode('utf-8'))
         response = {"longUrl": site, "shortUrl": short_url, "redis": "hit"}
         return JSONResponse(content=response)
 
@@ -97,4 +99,4 @@ def stop():
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='127.0.0.1', port=8000)
+    uvicorn.run(app, host='192.168.68.110', port=8000)

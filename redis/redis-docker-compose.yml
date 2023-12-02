@@ -11,8 +11,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 4096M
+          cpus: "0.5"
+          memory: 1024M
   redis_insight:
     image: redislabs/redisinsight:latest
     container_name: redis_insight
@@ -24,8 +24,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 512M
+          cpus: "0.2"
+          memory: 256M
 volumes:
   redis_volume_data:
   redis_insight_volume_data:
