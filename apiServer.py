@@ -9,6 +9,7 @@ import psutil
 import redis
 import time
 
+
 # Функция генерации короткого урла на основании id записи из БД
 def simple_shorter(urls_id):
     hashids = Hashids(min_length=6)
@@ -42,7 +43,6 @@ def data_base_interaction(site):
         else:
             cursor.execute('INSERT INTO urls (longurl) VALUES (%(longurl)s)',  # Добавляем запись с longurl в БД
                            {'longurl': site})
-            # connection.commit()
             cursor.execute('SELECT id FROM urls WHERE longurl=%(longurl)s', {'longurl': site})
             urls_id = cursor.fetchall()[0][0]  # Получаем id записи в БД
             short_url = simple_shorter(urls_id)  # Герерим короткий урл
@@ -63,13 +63,10 @@ def data_base_interaction(site):
             return cursor.fetchall()[0][0]  # Возвращаем короткий урл
 
     except (Exception, Error) as error:
-        ## print("ERROR with PostgreSQL", error)
-        print("69 ERROR")
-        time.sleep(0.5)
+        print("ERROR with PostgreSQL", error)
         if connection:
             cursor.close()
             connection.close()
-            time.sleep(0.5)
     finally:
         if connection:
             cursor.close()
@@ -80,6 +77,7 @@ def data_base_interaction(site):
 # Функции сервера fastAPI
 # Чтобы запустить из cmd "uvicorn apiServer:app --reload"
 app = FastAPI()
+
 r = redis.Redis(host='192.168.68.110', port=6379)
 call_db_retry_cnt = 3
 @app.get("/api/v1/urls/short")
@@ -87,9 +85,10 @@ def get_request_processor(site):
     domain = 'https://smg3.ru/'
     redis_data = r.get(site)  # Получаем пару из Redis по longurl
     if redis_data is None:
-        data = data_base_interaction(site)# Если в Redis нет значения, то взаимодействуем с PostgreSQL
-        if data == None or str(data) == 'None':
-            return JSONResponse(content={'error': 'DB_NONE'})
+        data = data_base_interaction(site) # Если в Redis нет значения, то взаимодействуем с PostgreSQL
+        if data == None or str(data) == 'None': # Если вызов функции вернул Null
+            return JSONResponse(content={'error': 'DB_INTERACTION_ERROR',
+                                         'data': str(data)})
         else:
             short_url = domain + str(data)
             response = {"longUrl": site, "shortUrl": short_url, "redis": "miss"}
@@ -112,4 +111,4 @@ def stop():
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='192.168.68.110', port=8000)
+    uvicorn.run(app, host='172.22.99.12', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110
