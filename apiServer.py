@@ -111,4 +111,4 @@ def stop():
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='172.22.99.12', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110
+    uvicorn.run(app, host='37.18.102.58', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110, cloud 37.18.102.58
