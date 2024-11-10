@@ -1,0 +1,52 @@
+version: "3.3"
+services:
+  postgres:
+    container_name: postgres-with-pgb
+    image: postgres:latest
+    depends_on:
+      - pgbouncer
+    environment:
+      POSTGRES_DB: "urls"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "123"
+      POSTGRES_LISTEN_ADDRESSES: "*"
+      POSTGRES_HOST_AUTH_METHOD: "md5"
+      POSTGRES_INITDB_ARGS: "--auth=md5"
+      PGDATA: /var/lib/postgresql/data/urls-data/
+    volumes:
+      - urls-data:/var/lib/postgresql/data/pgdata
+    ports:
+      - 5432:5432
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+
+  pgbouncer:
+    container_name: pgbouncer
+    image: bitnami/pgbouncer:latest
+    environment:
+      LISTEN_ADDR: "*"
+      LISTEN_PORT: 6432
+      POOL_MODE: "transaction"
+      "MAX_CLIENT_CONN": 1000
+      POSTGRESQL_HOST: "postgres"
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_USERNAME: "postgres"
+      PGBOUNCER_AUTH_USER: "postgres"
+      PGBOUNCER_AUTH_TYPE: "plain"
+      POSTGRESQL_PASSWORD: "123"
+      POSTGRESQL_DATABASE: "urls"
+      PGBOUNCER_DATABASE: "urls"
+    ports:
+      - 6432:6432
+    #deploy:
+    #  resources:
+    #    limits:
+    #      cpus: '1'
+    #      memory: 256M
+volumes:
+  urls-data:

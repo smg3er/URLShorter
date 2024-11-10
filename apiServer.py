@@ -31,8 +31,8 @@ def data_base_interaction(site):
     try:
         connection = psycopg2.connect(user='postgres',
                                       password='123',
-                                      host='192.168.68.110',
-                                      port='6432',
+                                      host='150.241.76.47',  # 150.241.76.47 - stockholm,  192.168.68.110 - local
+                                      port='5432',  # 6432 - pgbouncer, 5432 - postgres
                                       database='urls')
         cursor = connection.cursor()
         cursor.execute('SELECT shorturl, longurl FROM urls ' +
@@ -111,4 +111,4 @@ def stop():
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='37.18.102.58', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110, cloud 37.18.102.58
+    uvicorn.run(app, host='192.168.68.110', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110

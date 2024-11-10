@@ -8,7 +8,7 @@ cursor = None
 try:
     connection = psycopg2.connect(user='postgres',
                                   password='123',
-                                  host='127.0.0.1',
+                                  host='150.241.76.47',  # 150.241.76.47 - stockholm,  127.0.0.1 - local
                                   port='5432',
                                   database='urls')
 
