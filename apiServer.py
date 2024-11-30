@@ -1,3 +1,4 @@
+import fastapi
 from hashids import Hashids
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -8,7 +9,7 @@ import uvicorn
 import psutil
 import redis
 import time
-
+import prometheus_client
 
 # Функция генерации короткого урла на основании id записи из БД
 def simple_shorter(urls_id):
@@ -87,7 +88,9 @@ def get_request_processor(site):
     if redis_data is None:
         data = data_base_interaction(site) # Если в Redis нет значения, то взаимодействуем с PostgreSQL
         if data == None or str(data) == 'None': # Если вызов функции вернул Null
-            return JSONResponse(content={'error': 'DB_INTERACTION_ERROR',
+            return JSONResponse(status_code=500,
+                                content={'code': 'HTTP_500_INTERNAL_SERVER_ERROR',
+                                         'error': 'DB_INTERACTION_ERROR',
                                          'data': str(data)})
         else:
             short_url = domain + str(data)
@@ -99,6 +102,19 @@ def get_request_processor(site):
         response = {"longUrl": site, "shortUrl": short_url, "redis": "hit"}
         return JSONResponse(content=response)
 
+
+#  Актуатор
+metrics_app = prometheus_client.make_asgi_app()
+app.mount("/actuator/prometheus", metrics_app)
+
+http_rq_all = prometheus_client.Counter('http_requests_all', 'A counter of the all requests made')
+# Добавляем middleware который считает все запросы к серверу
+@app.middleware("tracing")
+def tracing(request: fastapi.Request, call_next):
+    http_rq_all.inc()
+    response = call_next(request)
+    return response
+
 @app.get("/stop")
 def stop():
 
@@ -107,8 +123,6 @@ def stop():
     for child in parent.children(recursive=True):
         child.kill()
     parent.kill()
-
-
 
 if __name__ == '__main__':
     uvicorn.run(app, host='192.168.68.110', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110

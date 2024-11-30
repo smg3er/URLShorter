@@ -8,9 +8,9 @@ import pandas as pd
 
 # Параметры
 number_of_top_sites = 500_000  # Размер списка наиболее посещаемых сайтов
-threads = 128  # Кол-во потоков, которые будут делать HTTP запросы
-request_qty_per_thread = 5000  # Количество запросов которое должен выполнить каждый поток
-other_sites_requests_factor = 12 # Фактор выборки (%) из списка other_sites
+threads = 8  # Кол-во потоков, которые будут делать HTTP запросы
+request_qty_per_thread = 1000  # Количество запросов которое должен выполнить каждый поток
+other_sites_requests_factor = 25 # Фактор выборки (%) из списка other_sites
 
 # Подготовка данных из которых затем будут формироваться запросы
 print('Reading from file ... ')
