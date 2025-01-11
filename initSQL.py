@@ -1,7 +1,7 @@
 import psycopg2
 from psycopg2 import Error
 # Подготовка БД
-# Создание таблицы urls
+# Создание базы urls
 connection = None
 cursor = None
 try:
