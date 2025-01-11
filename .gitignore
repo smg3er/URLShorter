@@ -1,0 +1,7 @@
+.idea/
+__pycache__/
+test.py
+top10milliondomains.csv
+123.py
+apiServerStart.bat
+HTTP queries/
