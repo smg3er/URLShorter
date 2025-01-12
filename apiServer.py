@@ -1,3 +1,4 @@
+import fastapi
 from hashids import Hashids
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -8,6 +9,7 @@ import uvicorn
 import psutil
 import redis
 import time
+import prometheus_client
 
 # Функция генерации короткого урла на основании id записи из БД
 def simple_shorter(urls_id):
@@ -30,8 +32,8 @@ def data_base_interaction(site):
     try:
         connection = psycopg2.connect(user='postgres',
                                       password='123',
-                                      host='192.168.68.110',
-                                      port='6432',
+                                      host='150.241.76.47',  # 150.241.76.47 - stockholm,  192.168.68.110 - local
+                                      port='5432',  # 6432 - pgbouncer, 5432 - postgres
                                       database='urls')
         cursor = connection.cursor()
         cursor.execute('SELECT shorturl, longurl FROM urls ' +
@@ -42,7 +44,6 @@ def data_base_interaction(site):
         else:
             cursor.execute('INSERT INTO urls (longurl) VALUES (%(longurl)s)',  # Добавляем запись с longurl в БД
                            {'longurl': site})
-            # connection.commit()
             cursor.execute('SELECT id FROM urls WHERE longurl=%(longurl)s', {'longurl': site})
             urls_id = cursor.fetchall()[0][0]  # Получаем id записи в БД
             short_url = simple_shorter(urls_id)  # Герерим короткий урл
@@ -63,13 +64,10 @@ def data_base_interaction(site):
             return cursor.fetchall()[0][0]  # Возвращаем короткий урл
 
     except (Exception, Error) as error:
-        ## print("ERROR with PostgreSQL", error)
-        print("69 ERROR")
-        time.sleep(0.5)
+        print("ERROR with PostgreSQL", error)
         if connection:
             cursor.close()
             connection.close()
-            time.sleep(0.5)
     finally:
         if connection:
             cursor.close()
@@ -80,6 +78,7 @@ def data_base_interaction(site):
 # Функции сервера fastAPI
 # Чтобы запустить из cmd "uvicorn apiServer:app --reload"
 app = FastAPI()
+
 r = redis.Redis(host='192.168.68.110', port=6379)
 call_db_retry_cnt = 3
 @app.get("/api/v1/urls/short")
@@ -87,9 +86,12 @@ def get_request_processor(site):
     domain = 'https://smg3.ru/'
     redis_data = r.get(site)  # Получаем пару из Redis по longurl
     if redis_data is None:
-        data = data_base_interaction(site)# Если в Redis нет значения, то взаимодействуем с PostgreSQL
-        if data == None or str(data) == 'None':
-            return JSONResponse(content={'error': 'DB_NONE'})
+        data = data_base_interaction(site) # Если в Redis нет значения, то взаимодействуем с PostgreSQL
+        if data == None or str(data) == 'None': # Если вызов функции вернул Null
+            return JSONResponse(status_code=500,
+                                content={'code': 'HTTP_500_INTERNAL_SERVER_ERROR',
+                                         'error': 'DB_INTERACTION_ERROR',
+                                         'data': str(data)})
         else:
             short_url = domain + str(data)
             response = {"longUrl": site, "shortUrl": short_url, "redis": "miss"}
@@ -100,6 +102,19 @@ def get_request_processor(site):
         response = {"longUrl": site, "shortUrl": short_url, "redis": "hit"}
         return JSONResponse(content=response)
 
+
+#  Актуатор
+metrics_app = prometheus_client.make_asgi_app()
+app.mount("/actuator/prometheus", metrics_app)
+
+http_rq_all = prometheus_client.Counter('http_requests_all', 'A counter of the all requests made')
+# Добавляем middleware который считает все запросы к серверу
+@app.middleware("tracing")
+def tracing(request: fastapi.Request, call_next):
+    http_rq_all.inc()
+    response = call_next(request)
+    return response
+
 @app.get("/stop")
 def stop():
 
@@ -109,7 +124,5 @@ def stop():
         child.kill()
     parent.kill()
 
-
-
 if __name__ == '__main__':
-    uvicorn.run(app, host='192.168.68.110', port=8000)
+    uvicorn.run(app, host='192.168.68.110', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110

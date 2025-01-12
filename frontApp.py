@@ -7,11 +7,10 @@ import time
 import pandas as pd
 
 # Параметры
-number_of_top_sites = 200_000  # Размер списка наиболее посещаемых сайтов
-threads = 20  # Кол-во потоков, которые будут делать HTTP запросы
-request_qty_per_thread = 50000  # Количество запросов которое должен выполнить каждый поток
-other_sites_requests_factor = 12 # Фактор выборки (%) из списка other_sites
-
+number_of_top_sites = 500_000  # Размер списка наиболее посещаемых сайтов
+threads = 8  # Кол-во потоков, которые будут делать HTTP запросы
+request_qty_per_thread = 1000  # Количество запросов которое должен выполнить каждый поток
+other_sites_requests_factor = 25 # Фактор выборки (%) из списка other_sites
 
 # Подготовка данных из которых затем будут формироваться запросы
 print('Reading from file ... ')
@@ -61,11 +60,9 @@ def api_requests(num_thread):
             rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site})
             rs_json = rs.json()
             if rs.status_code != 200:
-                print('ERROR found', rs)
-            elif rs_json.get('shortUrl') == 'https://smg3.ru/None':
-                print('ERROR found, shortUrl = None', rs_json)
-            elif rs_json.get('error') == 'DB_NONE':
-                print('****DB ERROR found, shortUrl = None', rs_json)
+                print('ERROR found', rs_json)
+            elif rs_json.get('error') == 'DB_INTERACTION_ERROR':
+                print('POSTGRES_ERROR', rs_json)
             else:
                 pass
         else:
@@ -74,10 +71,8 @@ def api_requests(num_thread):
             rs_json = rs.json()
             if rs.status_code != 200:
                 print('ERROR found', rs)
-            elif rs_json.get('shortUrl') == 'https://smg3.ru/None':
-                print('ERROR found, shortUrl = None', rs_json)
-            elif rs_json.get('error') == 'DB_NONE':
-                print('****DB ERROR found, shortUrl = None', rs_json)
+            elif rs_json.get('error') == 'DB_INTERACTION_ERROR':
+                print('POSTGRES_ERROR', rs_json)
             else:
                 pass
 
@@ -97,4 +92,4 @@ def api_requests(num_thread):
 for i in range(threads):
     thread = threading.Thread(target=api_requests, args=(i,))
     thread.start()
-    time.sleep(0.5)
+    time.sleep(0.33)
