@@ -107,12 +107,28 @@ def get_request_processor(site):
 metrics_app = prometheus_client.make_asgi_app()
 app.mount("/actuator/prometheus", metrics_app)
 
-http_rq_all = prometheus_client.Counter('http_requests_all', 'A counter of the all requests made')
-# Добавляем middleware который считает все запросы к серверу
-@app.middleware("tracing")
-def tracing(request: fastapi.Request, call_next):
-    http_rq_all.inc()
-    response = call_next(request)
+http_requests = prometheus_client.Counter('http_requests', 'Total count of HTTP requests',
+                                          ['method', 'status_code'])
+http_requests_seconds = prometheus_client.Histogram('http_requests_seconds', 'Duration of HTTP requests in seconds',
+                                                    ['method'])
+
+@app.middleware("http")
+async def http_metrics(request: fastapi.Request, call_next):
+    if request.url.path.startswith('/actuator/prometheus'):
+        return await call_next(request)
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        route = request.scope.get('route')
+        if route is not None:
+            http_requests.labels(method=route.path, status_code='500').inc()
+            http_requests_seconds.labels(method=route.path).observe(time.perf_counter() - start)
+        raise
+    route = request.scope.get('route')
+    if route is not None:
+        http_requests.labels(method=route.path, status_code=str(response.status_code)).inc()
+        http_requests_seconds.labels(method=route.path).observe(time.perf_counter() - start)
     return response
 
 @app.get("/stop")
