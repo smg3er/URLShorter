@@ -28,6 +28,64 @@
     - Обработка исключений и проброс на фронт
     - Написать свою функцию генерацию shortUrl (сейчас использована библиотека hashids)
 
+## Локальное окружение (Docker)
+
+Требуется Docker Desktop (compose v2). Два независимых стека:
+
+- `docker-compose.db.yml` — PostgreSQL + PgBouncer (transaction-pooling)
+- `docker-compose.redis.yml` — Redis + RedisInsight (UI)
+
+Порты биндятся только на `127.0.0.1`: `5432` (postgres), `6432` (pgbouncer), `6379` (redis), `8001` (RedisInsight UI).
+
+### Настройка
+
+```bat
+copy .env.example .env
+rem заполнить .env реальными значениями (см. комментарии в файле)
+```
+
+`.env` не коммитится (в `.gitignore`).
+
+### Запуск / остановка
+
+```bat
+docker compose -f docker-compose.db.yml up -d
+docker compose -f docker-compose.redis.yml up -d
+
+docker compose -f docker-compose.db.yml down
+docker compose -f docker-compose.redis.yml down
+```
+
+### Инициализация схемы БД
+
+`initSQL.py` принудительно пересоздаёт базу `urls` — запускается вручную, compose схему не трогает. Инициализация идёт напрямую в postgres (5432, мимо пула):
+
+```bat
+set "POSTGRES_HOST=127.0.0.1"
+set "POSTGRES_PORT=5432"
+py initSQL.py
+```
+
+### Запуск приложения
+
+Приложение работает через pgbouncer (6432) и Redis (6379):
+
+```bat
+set "POSTGRES_HOST=127.0.0.1"
+set "POSTGRES_PORT=6432"
+set "REDIS_HOST=127.0.0.1"
+set "REDIS_PORT=6379"
+py apiServer.py
+```
+
+Примечание: хост/порт в `uvicorn.run` внутри `apiServer.py` захардкожены (`192.168.68.110:8000`, существующий техдолг). Если этот IP не назначен машине, запускать через:
+
+```bat
+py -m uvicorn apiServer:app --host 127.0.0.1 --port 8000
+```
+
+Актуатор метрик: `http://127.0.0.1:8000/actuator/prometheus/` (со слэшем).
+
 ### Отладочная инфа (удалить потом)
 
 Проверить отсутствие дубликатов (после добавление constraints их не должно быть)

@@ -1,0 +1,56 @@
+services:
+  postgres:
+    container_name: postgres-with-pgb
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: "md5"
+      POSTGRES_INITDB_ARGS: "--auth=md5"
+    volumes:
+      - urls-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+  pgbouncer:
+    container_name: pgbouncer
+    image: bitnami/pgbouncer:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LISTEN_ADDR: "*"
+      LISTEN_PORT: 6432
+      POOL_MODE: "transaction"
+      MAX_CLIENT_CONN: 1000
+      POSTGRESQL_HOST: "postgres"
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_USERNAME: ${POSTGRES_USER}
+      PGBOUNCER_AUTH_USER: ${POSTGRES_USER}
+      PGBOUNCER_AUTH_TYPE: "plain"
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRESQL_DATABASE: ${POSTGRES_DB}
+      PGBOUNCER_DATABASE: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:6432:6432"
+    restart: unless-stopped
+    #deploy:
+    #  resources:
+    #    limits:
+    #      cpus: '1'
+    #      memory: 256M
+
+volumes:
+  urls-data:

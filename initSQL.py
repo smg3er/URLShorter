@@ -1,3 +1,4 @@
+import os
 import psycopg2
 from psycopg2 import Error
 # Подготовка БД
@@ -5,10 +6,10 @@ from psycopg2 import Error
 connection = None
 cursor = None
 try:
-    connection = psycopg2.connect(user='postgres',
-                                  password='123',
-                                  host='150.241.76.47',  # 150.241.76.47 - stockholm,  127.0.0.1 - local
-                                  port='5432')
+    connection = psycopg2.connect(user=os.getenv('POSTGRES_USER', 'postgres'),
+                                  password=os.getenv('POSTGRES_PASSWORD', '123'),
+                                  host=os.getenv('POSTGRES_HOST', '150.241.76.47'),  # 150.241.76.47 - stockholm,  127.0.0.1 - local
+                                  port=os.getenv('POSTGRES_PORT', '5432'))
     connection.autocommit = True
     cursor = connection.cursor()
     drop_database_query = 'DROP DATABASE IF EXISTS urls'
@@ -24,11 +25,11 @@ except (Exception, Error) as error:
 connection = None
 cursor = None
 try:
-    connection = psycopg2.connect(user='postgres',
-                                  password='123',
-                                  host='150.241.76.47',  # 150.241.76.47 - stockholm,  127.0.0.1 - local
-                                  port='5432',
-                                  database='urls')
+    connection = psycopg2.connect(user=os.getenv('POSTGRES_USER', 'postgres'),
+                                  password=os.getenv('POSTGRES_PASSWORD', '123'),
+                                  host=os.getenv('POSTGRES_HOST', '150.241.76.47'),  # 150.241.76.47 - stockholm,  127.0.0.1 - local
+                                  port=os.getenv('POSTGRES_PORT', '5432'),
+                                  database=os.getenv('POSTGRES_DB', 'urls'))
 
     cursor = connection.cursor()
     create_table_query = ''' CREATE TABLE urls

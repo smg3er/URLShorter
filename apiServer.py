@@ -30,11 +30,11 @@ def data_base_interaction(site):
     connection = None
     cursor = None
     try:
-        connection = psycopg2.connect(user='postgres',
-                                      password='123',
-                                      host='150.241.76.47',  # 150.241.76.47 - stockholm,  192.168.68.110 - local
-                                      port='5432',  # 6432 - pgbouncer, 5432 - postgres
-                                      database='urls')
+        connection = psycopg2.connect(user=os.getenv('POSTGRES_USER', 'postgres'),
+                                      password=os.getenv('POSTGRES_PASSWORD', '123'),
+                                      host=os.getenv('POSTGRES_HOST', '150.241.76.47'),  # 150.241.76.47 - stockholm,  192.168.68.110 - local
+                                      port=os.getenv('POSTGRES_PORT', '5432'),  # 6432 - pgbouncer, 5432 - postgres
+                                      database=os.getenv('POSTGRES_DB', 'urls'))
         cursor = connection.cursor()
         cursor.execute('SELECT shorturl, longurl FROM urls ' +
                        'WHERE longurl=%(longurl)s', {'longurl': site})
@@ -79,7 +79,7 @@ def data_base_interaction(site):
 # Чтобы запустить из cmd "uvicorn apiServer:app --reload"
 app = FastAPI()
 
-r = redis.Redis(host='192.168.68.110', port=6379)
+r = redis.Redis(host=os.getenv('REDIS_HOST', '192.168.68.110'), port=int(os.getenv('REDIS_PORT', '6379')))
 call_db_retry_cnt = 3
 @app.get("/api/v1/urls/short")
 def get_request_processor(site):
