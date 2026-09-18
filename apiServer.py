@@ -10,6 +10,7 @@ import psutil
 import redis
 import time
 import prometheus_client
+import metricsPush
 
 # Функция генерации короткого урла на основании id записи из БД
 def simple_shorter(urls_id):
@@ -140,5 +141,8 @@ def stop():
         child.kill()
     parent.kill()
 
+# Запуск фонового демона отправки метрик в Pushgateway (см. metricsPush.py)
+metricsPush.start_metrics_push()
+
 if __name__ == '__main__':
-    uvicorn.run(app, host='192.168.68.110', port=8000) # WSL 172.22.99.12, WIN 192.168.68.110
+    uvicorn.run(app, host='127.0.0.1', port=8000) # localhost; ранее был захардкожен LAN IP 192.168.68.110

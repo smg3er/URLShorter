@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # Единственная цель: Pushgateway, куда пушит метрики приложение (job=urlshorter).
+  # honor_labels сохраняет лейблы, с которыми приложение отправило метрики.
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']

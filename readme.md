@@ -78,13 +78,28 @@ set "REDIS_PORT=6379"
 py apiServer.py
 ```
 
-Примечание: хост/порт в `uvicorn.run` внутри `apiServer.py` захардкожены (`192.168.68.110:8000`, существующий техдолг). Если этот IP не назначен машине, запускать через:
+Актуатор метрик: `http://127.0.0.1:8000/actuator/prometheus/` (со слэшем).
+
+### Мониторинг (Prometheus + Grafana, push-модель)
+
+Метрики отправляет фоновый демон `metricsPush.py` (стартует вместе с `apiServer.py`): каждые 15 секунд он пушит в Pushgateway HTTP-метрики приложения и метрики PostgreSQL/Redis из серверной статистики (`pg_stat_*`, redis `INFO`/`DBSIZE`). Prometheus собирает их из Pushgateway, Grafana показывает дэшборд «URLShorter Observability» — datasource и дэшборд провиженятся автоматически.
+
+Переменные окружения демона (необязательны):
+
+- `METRICS_PUSHGATEWAY` — адрес Pushgateway (по умолчанию `localhost:9091`)
+- `METRICS_PUSH_INTERVAL` — интервал отправки, секунды (по умолчанию `15`)
+
+Подключение к PostgreSQL и Redis демон берёт из тех же переменных, что и приложение (`POSTGRES_*`, `REDIS_*`).
+
+Запуск / остановка monitoring-стека (Prometheus `http://localhost:9090`, Grafana `http://localhost:3000`, Pushgateway `http://localhost:9091`; все порты только на `127.0.0.1`):
 
 ```bat
-py -m uvicorn apiServer:app --host 127.0.0.1 --port 8000
+docker compose -f docker-compose.monitoring.yml up -d
+
+docker compose -f docker-compose.monitoring.yml down
 ```
 
-Актуатор метрик: `http://127.0.0.1:8000/actuator/prometheus/` (со слэшем).
+Креды Grafana задаются при старте через `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` (по умолчанию `admin`/`admin`). Проверка сбора: `http://localhost:9090/targets` — цель `pushgateway` в состоянии `up`.
 
 ### Отладочная инфа (удалить потом)
 
