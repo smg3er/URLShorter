@@ -14,33 +14,18 @@ other_sites_requests_factor = 25 # Фактор выборки (%) из спис
 
 # Подготовка данных из которых затем будут формироваться запросы
 print('Reading from file ... ')
-web_hosts_data = pd.read_csv('top10milliondomains.csv', delimiter=',')  # Файл с 10млн сайтов
-print('Readind file success!')
+web_hosts_data = pd.read_csv('top10milliondomains.csv', delimiter=',', usecols=['Domain'])
+print('Reading file success!')
 
-def top_sites_data_preparing():
-    print('Top sites data preparing start....')
-    start_preparing_data = time.time()
-    top_sites_list = []  # Список наиболее посещаемых сайтов
-    for i in range(number_of_top_sites):
-        top_sites_list.append((web_hosts_data.iloc[i]['Domain']))
-    end_preparing_data = time.time()
-    print('Data preparing complete ', end_preparing_data - start_preparing_data, 'sec')
-    return top_sites_list
+print('Data preparing start....')
+start_preparing_data = time.time()
+domains = web_hosts_data['Domain'].to_list()
+top_sites_list = domains[:number_of_top_sites]  # Список наиболее посещаемых сайтов
+other_sites_list = domains[number_of_top_sites:]  # Общий список сайтов за исключением наиболее посещаемых
+print('Data preparing complete ', time.time() - start_preparing_data, 'sec')
 
-def other_sites_data_preparing():
-    print('Other sites data preparing start....')
-    start_preparing_data = time.time()
-    other_sites_list = []  # Общий список сайтов за исключением наиболее посещаемых
-    for i in range(number_of_top_sites, len(web_hosts_data)):
-        other_sites_list.append((web_hosts_data.iloc[i]['Domain']))
-    end_preparing_data = time.time()
-    print('Data preparing complete ', end_preparing_data - start_preparing_data, 'sec')
-    return other_sites_list
-
-
-# Получаем данные
-top_sites_list = top_sites_data_preparing()
-other_sites_list = other_sites_data_preparing()
+# Результаты каждого потока для общего итога: [rps потока, cache_hits, cache_misses]
+thread_results = []
 
 def api_requests(num_thread):
     # Функция генерации запросов и ее параметры
@@ -55,41 +40,53 @@ def api_requests(num_thread):
     cache_hits = 0
     cache_misses = 0
     for i in range(request_qty_per_thread):
+        rq_qty += 1
         if i % other_sites_requests_factor == 0:
             site = other_sites_list[random.randint(0, len(other_sites_list) - 1)]
-            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site})
-            rs_json = rs.json()
-            if rs.status_code != 200:
-                print('ERROR found', rs_json)
-            elif rs_json.get('error') == 'DB_INTERACTION_ERROR':
-                print('POSTGRES_ERROR', rs_json)
-            else:
-                pass
         else:
             site = top_sites_list[random.randint(0, len(top_sites_list) - 1)]
-            rs = session.get('http://192.168.68.110:8000/api/v1/urls/short', params={"site": site})
-            rs_json = rs.json()
-            if rs.status_code != 200:
-                print('ERROR found', rs)
-            elif rs_json.get('error') == 'DB_INTERACTION_ERROR':
-                print('POSTGRES_ERROR', rs_json)
-            else:
-                pass
 
-        rq_qty += 1
-        redis_status = rs_json.get('redis')
-        if redis_status == 'miss':
-            cache_misses += 1
+        try:
+            rs = session.get('http://localhost:8000/api/v1/urls/short', params={"site": site})
+            rs_json = rs.json()
+        except Exception as error:
+            print('REQUEST_ERROR', error)
+            continue
+
+        if rs.status_code != 200:
+            print('ERROR found', rs_json)
+        elif rs_json.get('error') == 'DB_INTERACTION_ERROR':
+            print('POSTGRES_ERROR', rs_json)
         else:
-            cache_hits += 1
+            redis_status = rs_json.get('redis')
+            if redis_status == 'miss':
+                cache_misses += 1
+            else:
+                cache_hits += 1
     request_end = time.time()
 
     print(f'Requests complete for time: {(request_end - request_start):0.2f} sec')
     print(f'Performance per thread: {(rq_qty/(request_end-request_start)):0.0f} rps')
     print(f'Redis stats: hits: {cache_hits}, misses: {cache_misses}')
+    thread_results.append([rq_qty / (request_end - request_start), cache_hits, cache_misses])
 
 # Запускаем функцию api_requests в N потоках (указано в range)
+runned_threads = []
 for i in range(threads):
     thread = threading.Thread(target=api_requests, args=(i,))
+    runned_threads.append(thread)
     thread.start()
     time.sleep(0.33)
+
+# Ждем завершения всех потоков и печатаем общий итог
+for thread in runned_threads:
+    thread.join()
+
+total_rps = 0
+total_hits = 0
+total_misses = 0
+for thread_result in thread_results:
+    total_rps += thread_result[0]
+    total_hits += thread_result[1]
+    total_misses += thread_result[2]
+print(f'TOTAL: {total_rps:0.0f} rps, redis hits: {total_hits}, misses: {total_misses}')
