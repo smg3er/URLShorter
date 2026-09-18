@@ -7,9 +7,9 @@ import time
 import pandas as pd
 
 # Параметры
-number_of_top_sites = 500_000  # Размер списка наиболее посещаемых сайтов
-threads = 8  # Кол-во потоков, которые будут делать HTTP запросы
-request_qty_per_thread = 1000  # Количество запросов которое должен выполнить каждый поток
+number_of_top_sites = 100_000  # Размер списка наиболее посещаемых сайтов
+threads = 24  # Кол-во потоков, которые будут делать HTTP запросы
+request_qty_per_thread = 10000  # Количество запросов которое должен выполнить каждый поток
 other_sites_requests_factor = 25 # Фактор выборки (%) из списка other_sites
 
 # Подготовка данных из которых затем будут формироваться запросы
@@ -76,7 +76,7 @@ for i in range(threads):
     thread = threading.Thread(target=api_requests, args=(i,))
     runned_threads.append(thread)
     thread.start()
-    time.sleep(0.33)
+    time.sleep(0.03)
 
 # Ждем завершения всех потоков и печатаем общий итог
 for thread in runned_threads:
