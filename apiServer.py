@@ -11,17 +11,33 @@ import redis
 import time
 import prometheus_client
 import metricsPush
+from config import get_positive_int_env, get_required_env, get_url_env
+
+
+POSTGRES_USER = get_required_env('POSTGRES_USER')
+POSTGRES_PASSWORD = get_required_env('POSTGRES_PASSWORD')
+POSTGRES_HOST = get_required_env('POSTGRES_HOST')
+POSTGRES_PORT = get_positive_int_env('POSTGRES_PORT', maximum=65535)
+POSTGRES_DB = get_required_env('POSTGRES_DB')
+REDIS_HOST = get_required_env('REDIS_HOST')
+REDIS_PORT = get_positive_int_env('REDIS_PORT', maximum=65535)
+API_HOST = get_required_env('API_HOST')
+API_PORT = get_positive_int_env('API_PORT', maximum=65535)
+SHORT_URL_BASE_URL = get_url_env('SHORT_URL_BASE_URL').rstrip('/') + '/'
+REDIS_TTL_SECONDS = get_positive_int_env('REDIS_TTL_SECONDS')
+HASHIDS_SALT = get_required_env('HASHIDS_SALT')
+HASHIDS_MIN_LENGTH = get_positive_int_env('HASHIDS_MIN_LENGTH')
 
 # Функция генерации короткого урла на основании id записи из БД
 def simple_shorter(urls_id):
-    hashids = Hashids(min_length=6)
+    hashids = Hashids(min_length=HASHIDS_MIN_LENGTH)
     link = hashids.encode(urls_id)
     short_url = ('{link}'.format(link=link))
     return short_url
 
 # Функиця генерации короткого урла с солью на основании id записи из БД
 def simple_shorter_salt(urls_id):
-    hashids = Hashids(salt='amazing smg3', min_length=6)
+    hashids = Hashids(salt=HASHIDS_SALT, min_length=HASHIDS_MIN_LENGTH)
     link = hashids.encode(urls_id)
     short_url = ('{link}'.format(link=link))
     return short_url
@@ -31,11 +47,11 @@ def data_base_interaction(site):
     connection = None
     cursor = None
     try:
-        connection = psycopg2.connect(user=os.getenv('POSTGRES_USER', 'postgres'),
-                                      password=os.getenv('POSTGRES_PASSWORD', '123'),
-                                      host=os.getenv('POSTGRES_HOST', '150.241.76.47'),  # 150.241.76.47 - stockholm,  192.168.68.110 - local
-                                      port=os.getenv('POSTGRES_PORT', '5432'),  # 6432 - pgbouncer, 5432 - postgres
-                                      database=os.getenv('POSTGRES_DB', 'urls'))
+        connection = psycopg2.connect(user=POSTGRES_USER,
+                                      password=POSTGRES_PASSWORD,
+                                      host=POSTGRES_HOST,
+                                      port=POSTGRES_PORT,
+                                      database=POSTGRES_DB)
         cursor = connection.cursor()
         cursor.execute('SELECT shorturl, longurl FROM urls ' +
                        'WHERE longurl=%(longurl)s', {'longurl': site})
@@ -80,11 +96,11 @@ def data_base_interaction(site):
 # Чтобы запустить из cmd "uvicorn apiServer:app --reload"
 app = FastAPI()
 
-r = redis.Redis(host=os.getenv('REDIS_HOST', '192.168.68.110'), port=int(os.getenv('REDIS_PORT', '6379')))
-call_db_retry_cnt = 3
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)
+
+
 @app.get("/api/v1/urls/short")
 def get_request_processor(site):
-    domain = 'https://smg3.ru/'
     redis_data = r.get(site)  # Получаем пару из Redis по longurl
     if redis_data is None:
         data = data_base_interaction(site) # Если в Redis нет значения, то взаимодействуем с PostgreSQL
@@ -94,9 +110,9 @@ def get_request_processor(site):
                                          'error': 'DB_INTERACTION_ERROR',
                                          'data': str(data)})
         else:
-            short_url = domain + str(data)
+            short_url = SHORT_URL_BASE_URL + str(data)
             response = {"longUrl": site, "shortUrl": short_url, "redis": "miss"}
-            r.set(site, short_url, ex=600)  # Добавляем в Redis пару
+            r.set(site, short_url, ex=REDIS_TTL_SECONDS)  # Добавляем в Redis пару
             return JSONResponse(content=response)
     else:  # Иначе возвращаем из Redis
         short_url = str(redis_data.decode('utf-8'))
@@ -145,4 +161,4 @@ def stop():
 metricsPush.start_metrics_push()
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='127.0.0.1', port=8000) # localhost; ранее был захардкожен LAN IP 192.168.68.110
+    uvicorn.run(app, host=API_HOST, port=API_PORT)

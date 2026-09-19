@@ -1,10 +1,11 @@
-import os
 import threading
 import time
 
 import psycopg2
 import prometheus_client
 import redis
+
+from config import get_positive_int_env, get_required_env
 
 # Метрики состояния PostgreSQL и Redis, которые демон собирает и отправляет в Pushgateway.
 # HTTP-метрики (http_requests, http_requests_seconds) объявлены в apiServer.py и
@@ -19,14 +20,29 @@ redis_hits = prometheus_client.Gauge('redis_hits', 'Total cache hits in Redis (c
 redis_misses = prometheus_client.Gauge('redis_misses', 'Total cache misses in Redis (cumulative)')
 
 
-# Сбор метрик PostgreSQL: новое подключение на каждый цикл (те же env, что у приложения),
+# Читаем только настройки, необходимые демону метрик.
+def load_metrics_config():
+    return {
+        'postgres': {
+            'user': get_required_env('POSTGRES_USER'),
+            'password': get_required_env('POSTGRES_PASSWORD'),
+            'host': get_required_env('POSTGRES_HOST'),
+            'port': get_positive_int_env('POSTGRES_PORT', maximum=65535),
+            'database': get_required_env('POSTGRES_DB'),
+        },
+        'redis': {
+            'host': get_required_env('REDIS_HOST'),
+            'port': get_positive_int_env('REDIS_PORT', maximum=65535),
+        },
+        'gateway': get_required_env('METRICS_PUSHGATEWAY'),
+        'interval': get_positive_int_env('METRICS_PUSH_INTERVAL'),
+    }
+
+
+# Сбор метрик PostgreSQL: новое подключение на каждый цикл,
 # простые запросы к системным view. Считаем и себя: подключение демона на пару секунд видно как +1.
-def collect_postgres():
-    connection = psycopg2.connect(user=os.getenv('POSTGRES_USER', 'postgres'),
-                                  password=os.getenv('POSTGRES_PASSWORD', '123'),
-                                  host=os.getenv('POSTGRES_HOST', '150.241.76.47'),
-                                  port=os.getenv('POSTGRES_PORT', '5432'),  # 6432 - pgbouncer, 5432 - postgres
-                                  database=os.getenv('POSTGRES_DB', 'urls'))
+def collect_postgres(postgres_config):
+    connection = psycopg2.connect(**postgres_config)
     cursor = connection.cursor()
     cursor.execute('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()')
     db_connections.set(cursor.fetchall()[0][0])
@@ -40,9 +56,8 @@ def collect_postgres():
 
 
 # Сбор метрик Redis из INFO и DBSIZE
-def collect_redis():
-    r = redis.Redis(host=os.getenv('REDIS_HOST', '192.168.68.110'),
-                    port=int(os.getenv('REDIS_PORT', '6379')))
+def collect_redis(redis_config):
+    r = redis.Redis(**redis_config)
     info = r.info()
     redis_clients.set(info['connected_clients'])
     redis_commands.set(info['total_commands_processed'])
@@ -54,17 +69,15 @@ def collect_redis():
 # Цикл демона: собрать метрики, отправить всё в Pushgateway, подождать интервал.
 # Сбор PG, сбор Redis и отправка независимы: падение одного не мешает остальным,
 # и HTTP-метрики доходят в Pushgateway даже если БД или Redis недоступны.
-def push_loop():
-    gateway = os.getenv('METRICS_PUSHGATEWAY', 'localhost:9091')
-    interval = int(os.getenv('METRICS_PUSH_INTERVAL', '15'))
+def push_loop(postgres_config, redis_config, gateway, interval):
     print('Metrics push daemon started, gateway =', gateway, ', interval =', interval, 'sec')
     while True:
         try:
-            collect_postgres()
+            collect_postgres(postgres_config)
         except (Exception, psycopg2.Error) as error:
             print('ERROR with PostgreSQL metrics', error)
         try:
-            collect_redis()
+            collect_redis(redis_config)
         except Exception as error:
             print('ERROR with Redis metrics', error)
         try:
@@ -75,6 +88,22 @@ def push_loop():
 
 
 # Запуск демона в фоновом потоке (вызывается из apiServer.py при старте приложения)
-def start_metrics_push():
-    thread = threading.Thread(target=push_loop, daemon=True)
+def start_metrics_push(thread_factory=threading.Thread):
+    settings = load_metrics_config()
+    thread = thread_factory(
+        target=push_loop,
+        args=(settings['postgres'], settings['redis'], settings['gateway'], settings['interval']),
+        daemon=True,
+    )
     thread.start()
+    return thread
+
+
+def main():
+    start_metrics_push()
+    while True:
+        time.sleep(3600)
+
+
+if __name__ == '__main__':
+    main()
